@@ -13,7 +13,6 @@ func InputScanner() *bufio.Scanner {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
 
 	return bufio.NewScanner(file)
 }
