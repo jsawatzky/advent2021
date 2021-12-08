@@ -74,6 +74,9 @@
 		},
 		{
 			"path": "day25"
+		},
+		{
+			"path": "helpers"
 		}
 	],
 	"settings": {}
