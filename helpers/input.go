@@ -8,13 +8,20 @@ import (
 	"strings"
 )
 
-func InputScanner() *bufio.Scanner {
+type CloseFunc func()
+
+func InputScanner() (*bufio.Scanner, CloseFunc) {
 	file, err := os.Open("input.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return bufio.NewScanner(file)
+	return bufio.NewScanner(file), func() {
+		err := file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func ReadInput() string {
@@ -27,7 +34,8 @@ func ReadInput() string {
 
 func ReadInputLines() []string {
 	lines := make([]string, 0, 100)
-	scanner := InputScanner()
+	scanner, close := InputScanner()
+	defer close()
 	for scanner.Scan() {
 		lines = append(lines, strings.TrimSpace(scanner.Text()))
 	}
