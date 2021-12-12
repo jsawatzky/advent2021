@@ -36,11 +36,30 @@ func InInt(v int, arr []int) bool {
 	return false
 }
 
-func InStr(v rune, s string) bool {
+func InStr(v string, arr []string) bool {
+	for _, v2 := range arr {
+		if v == v2 {
+			return true
+		}
+	}
+	return false
+}
+
+func CharInStr(v rune, s string) bool {
 	for _, v2 := range s {
 		if v == v2 {
 			return true
 		}
 	}
 	return false
+}
+
+func CountStr(v string, arr []string) int {
+	total := 0
+	for _, v2 := range arr {
+		if v == v2 {
+			total += 1
+		}
+	}
+	return total
 }
