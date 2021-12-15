@@ -8,10 +8,12 @@ import (
 	"strings"
 )
 
+const inputFile = "input.txt"
+
 type CloseFunc func()
 
 func InputScanner() (*bufio.Scanner, CloseFunc) {
-	file, err := os.Open("input.txt")
+	file, err := os.Open(inputFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -25,7 +27,7 @@ func InputScanner() (*bufio.Scanner, CloseFunc) {
 }
 
 func ReadInput() string {
-	input, err := os.ReadFile("input.txt")
+	input, err := os.ReadFile(inputFile)
 	if err != nil {
 		panic(err)
 	}
