@@ -8,7 +8,13 @@ import (
 	"strings"
 )
 
-const inputFile = "input.txt"
+var inputFile = "input.txt"
+
+func init() {
+	if len(os.Args) > 1 {
+		inputFile = os.Args[1]
+	}
+}
 
 type CloseFunc func()
 
@@ -62,4 +68,12 @@ func AtoiArr(arr []string) []int {
 		ret = append(ret, Atoi(s))
 	}
 	return ret
+}
+
+func BinaryToInt(bin string) int {
+	res, err := strconv.ParseInt(bin, 2, 64)
+	if err != nil {
+		panic(err)
+	}
+	return int(res)
 }
