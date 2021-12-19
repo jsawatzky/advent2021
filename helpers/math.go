@@ -25,3 +25,10 @@ func Sum(arr []int) int {
 func Avg(arr []int) int {
 	return Sum(arr) / len(arr)
 }
+
+func Abs(i int) int {
+	if i < 0 {
+		return i * -1
+	}
+	return i
+}
