@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/jsawatzky/advent/helpers"
 )
@@ -22,7 +23,7 @@ var EnergyMap = map[rune]int{
 	'D': 1000,
 }
 
-type Room [2]rune
+type Room [4]rune
 type Hallway [11]rune
 type Input struct {
 	Hallway Hallway
@@ -31,9 +32,9 @@ type Input struct {
 
 func (in Input) Solved() bool {
 	for i, r := range in.Rooms {
-		if r[0] == '.' || r[1] == '.' {
+		if r[0] == '.' || r[1] == '.' || r[2] == '.' || r[3] == '.' {
 			return false
-		} else if r[0] == r[1] && r[0] == ExpectedRooms[i] {
+		} else if r[0] == r[1] && r[0] == r[2] && r[0] == r[3] && r[0] == ExpectedRooms[i] {
 			continue
 		} else {
 			return false
@@ -59,6 +60,16 @@ func (in Input) Print() {
 		fmt.Printf("%c#", r[1])
 	}
 	fmt.Println()
+	fmt.Print("  #")
+	for _, r := range in.Rooms {
+		fmt.Printf("%c#", r[2])
+	}
+	fmt.Println()
+	fmt.Print("  #")
+	for _, r := range in.Rooms {
+		fmt.Printf("%c#", r[3])
+	}
+	fmt.Println()
 	fmt.Println("  #########")
 }
 
@@ -71,52 +82,75 @@ func readInput() Input {
 	r0 := []rune(lines[2])
 	r1 := []rune(lines[3])
 	input.Rooms[0][0] = r0[3]
-	input.Rooms[0][1] = r1[1]
+	input.Rooms[0][1] = 'D'
+	input.Rooms[0][2] = 'D'
+	input.Rooms[0][3] = r1[1]
 	input.Rooms[1][0] = r0[5]
-	input.Rooms[1][1] = r1[3]
+	input.Rooms[1][1] = 'C'
+	input.Rooms[1][2] = 'B'
+	input.Rooms[1][3] = r1[3]
 	input.Rooms[2][0] = r0[7]
-	input.Rooms[2][1] = r1[5]
+	input.Rooms[2][1] = 'B'
+	input.Rooms[2][2] = 'A'
+	input.Rooms[2][3] = r1[5]
 	input.Rooms[3][0] = r0[9]
-	input.Rooms[3][1] = r1[7]
+	input.Rooms[3][1] = 'A'
+	input.Rooms[3][2] = 'C'
+	input.Rooms[3][3] = r1[7]
 
 	return input
 }
 
 type CacheValue struct {
-	Energy      int
 	StartEnergy int
 	Valid       bool
 }
 
-var memo map[Input]CacheValue = make(map[Input]CacheValue)
+type Result struct {
+	Energy int
+	Valid  bool
+}
 
-func Solve(in Input, total int) (int, bool) {
-	if c, ok := memo[in]; ok {
+var memo map[Input]CacheValue = make(map[Input]CacheValue)
+var mu sync.Mutex
+
+func Solve(in Input, total int, results chan<- Result) {
+	defer close(results)
+
+	mu.Lock()
+	c, ok := memo[in]
+	mu.Unlock()
+	if ok {
 		if !c.Valid {
-			return 0, false
+			return
 		} else if c.StartEnergy < total {
-			return 0, false
+			return
 		}
 	}
 
 	if in.Solved() {
-		return total, true
+		results <- Result{Energy: total, Valid: true}
+		return
 	}
 
 	min := math.MaxInt32
 	valid := false
 
 	for i, r := range in.Rooms {
-		if r[0] == '.' && r[1] == '.' {
+		if r[0] == '.' && r[1] == '.' && r[2] == '.' && r[3] == '.' {
 			continue
-		} else if r[0] == r[1] && r[0] == ExpectedRooms[i] {
+		} else if r[0] == r[1] && r[0] == r[2] && r[0] == r[3] && r[0] == ExpectedRooms[i] {
 			continue
-		} else if r[0] == '.' && r[1] == ExpectedRooms[i] {
+		} else if r[0] == '.' && r[1] == ExpectedRooms[i] && r[2] == ExpectedRooms[i] && r[3] == ExpectedRooms[i] {
+			continue
+		} else if r[0] == '.' && r[1] == '.' && r[2] == ExpectedRooms[i] && r[3] == ExpectedRooms[i] {
+			continue
+		} else if r[0] == '.' && r[1] == '.' && r[2] == '.' && r[3] == ExpectedRooms[i] {
 			continue
 		}
 		j := 0
-		if r[j] == '.' {
-			j = 1
+		for r[j] == '.' {
+			j++
 		}
 
 		for h := BarredSpaces[i]; h < 11; h++ {
@@ -130,9 +164,16 @@ func Solve(in Input, total int) (int, bool) {
 			newHall[h] = r[j]
 			newRooms[i][j] = '.'
 			energy := (j + helpers.Abs(BarredSpaces[i]-h) + 1) * EnergyMap[r[j]]
-			if m, v := Solve(Input{Hallway: newHall, Rooms: newRooms}, total+energy); v {
-				min = helpers.Min(m, min)
-				valid = true
+			res := make(chan Result)
+			go Solve(Input{Hallway: newHall, Rooms: newRooms}, total+energy, res)
+			for result := range res {
+				if result.Valid {
+					if result.Energy < min {
+						min = result.Energy
+					}
+					valid = true
+				}
+
 			}
 		}
 		for h := BarredSpaces[i]; h >= 0; h-- {
@@ -146,9 +187,16 @@ func Solve(in Input, total int) (int, bool) {
 			newHall[h] = r[j]
 			newRooms[i][j] = '.'
 			energy := (j + helpers.Abs(BarredSpaces[i]-h) + 1) * EnergyMap[r[j]]
-			if m, v := Solve(Input{Hallway: newHall, Rooms: newRooms}, total+energy); v {
-				min = helpers.Min(m, min)
-				valid = true
+			res := make(chan Result)
+			go Solve(Input{Hallway: newHall, Rooms: newRooms}, total+energy, res)
+			for result := range res {
+				if result.Valid {
+					if result.Energy < min {
+						min = result.Energy
+					}
+					valid = true
+				}
+
 			}
 		}
 	}
@@ -163,6 +211,10 @@ hallLoop:
 			continue
 		} else if in.Rooms[r][1] != h && in.Rooms[r][1] != '.' {
 			continue
+		} else if in.Rooms[r][2] != h && in.Rooms[r][2] != '.' {
+			continue
+		} else if in.Rooms[r][3] != h && in.Rooms[r][3] != '.' {
+			continue
 		}
 		dir := 1
 		if BarredSpaces[r] < i {
@@ -173,48 +225,54 @@ hallLoop:
 				continue hallLoop
 			}
 		}
-		if in.Rooms[r][1] == '.' {
-			newHall := in.Hallway
-			newRooms := in.Rooms
-			newHall[i] = '.'
-			newRooms[r][1] = h
-			energy := (helpers.Abs(BarredSpaces[r]-i) + 2) * EnergyMap[h]
-			if m, v := Solve(Input{Hallway: newHall, Rooms: newRooms}, total+energy); v {
-				min = helpers.Min(m, min)
+		j := 0
+		for j < 4 && in.Rooms[r][j] == '.' {
+			j++
+		}
+		j--
+		newHall := in.Hallway
+		newRooms := in.Rooms
+		newHall[i] = '.'
+		newRooms[r][j] = h
+		energy := (helpers.Abs(BarredSpaces[r]-i) + j + 1) * EnergyMap[h]
+		res := make(chan Result)
+		go Solve(Input{Hallway: newHall, Rooms: newRooms}, total+energy, res)
+		for result := range res {
+			if result.Valid {
+				if result.Energy < min {
+					min = result.Energy
+				}
 				valid = true
 			}
-		} else {
-			newHall := in.Hallway
-			newRooms := in.Rooms
-			newHall[i] = '.'
-			newRooms[r][0] = h
-			energy := (helpers.Abs(BarredSpaces[r]-i) + 1) * EnergyMap[h]
-			if m, v := Solve(Input{Hallway: newHall, Rooms: newRooms}, total+energy); v {
-				min = helpers.Min(m, min)
-				valid = true
-			}
+
 		}
 	}
 
-	memo[in] = CacheValue{Energy: min, StartEnergy: total, Valid: valid}
+	mu.Lock()
+	memo[in] = CacheValue{StartEnergy: total, Valid: valid}
+	mu.Unlock()
 
-	return min, valid
+	results <- Result{Energy: min, Valid: valid}
 }
 
 func partOne() {
-	input := readInput()
-
-	ans, val := Solve(input, 0)
-	if !val {
-		panic("Input not valid")
-	}
-
-	fmt.Printf("Part 1: %d\n", ans)
+	fmt.Printf("Part 1: See old commit\n")
 }
 
 func partTwo() {
+	input := readInput()
 
-	ans := 0
+	ans := math.MaxInt32
+	results := make(chan Result)
+	go Solve(input, 0, results)
+
+	for res := range results {
+		if res.Valid {
+			if res.Energy < ans {
+				ans = res.Energy
+			}
+		}
+	}
 
 	fmt.Printf("Part 2: %d\n", ans)
 }
